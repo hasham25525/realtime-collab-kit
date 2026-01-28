@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Realtime Collab Kit - Advanced Features Demo</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #1a1a1a;
+      color: #fff;
+    }
+    #cursors {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1000;
+    }
+    .cursor {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border: 2px solid;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+    .cursor.reconnecting {
+      opacity: 0.5;
+    }
+    #info {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.9);
+      padding: 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      max-width: 350px;
+      border: 2px solid #333;
+    }
+    .status-indicator {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+    .status-indicator.connected { background: #4ade80; }
+    .status-indicator.connecting { background: #fbbf24; }
+    .status-indicator.reconnecting { background: #f59e0b; }
+    .status-indicator.disconnected { background: #ef4444; }
+    #roomInfo {
+      margin-top: 15px;
+      padding-top: 15px;
+      border-top: 1px solid #444;
+      font-size: 12px;
+      color: #aaa;
+    }
+    input[type="text"], textarea {
+      padding: 10px;
+      font-size: 14px;
+      border: 1px solid #444;
+      background: #2a2a2a;
+      color: #fff;
+      border-radius: 4px;
+      width: 100%;
+      box-sizing: border-box;
+      margin-top: 5px;
+    }
+    textarea {
+      min-height: 60px;
+      resize: vertical;
+    }
+    button {
+      padding: 10px 15px;
+      background: #4a4a4a;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-top: 10px;
+      font-size: 14px;
+    }
+    button:hover {
+      background: #5a5a5a;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    #typing {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(0, 0, 0, 0.9);
+      padding: 10px 15px;
+      border-radius: 8px;
+      font-size: 14px;
+      border: 2px solid #333;
+    }
+    #customEvents {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.9);
+      padding: 15px;
+      border-radius: 8px;
+      font-size: 12px;
+      max-width: 300px;
+      max-height: 200px;
+      overflow-y: auto;
+      border: 2px solid #333;
+    }
+    .event-item {
+      padding: 5px 0;
+      border-bottom: 1px solid #333;
+      color: #aaa;
+    }
+    .event-item:last-child {
+      border-bottom: none;
+    }
+    .event-name {
+      color: #60a5fa;
+      font-weight: bold;
+    }
+    #controls {
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid #444;
+    }
+    .control-group {
+      margin-bottom: 15px;
+    }
+    .control-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 12px;
+      color: #aaa;
+    }
+    #stats {
+      margin-top: 15px;
+      padding-top: 15px;
+      border-top: 1px solid #444;
+      font-size: 11px;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <div id="cursors"></div>
+  
+  <div id="info">
+    <h3>🛰️ Realtime Collab Kit</h3>
+    <div>
+      <span class="status-indicator" id="statusIndicator"></span>
+      <span id="connectionStatus">Connecting...</span>
+    </div>
+    <p>Users online: <span id="userCount">0</span></p>
+    <p>Move your mouse to see your cursor!</p>
+    
+    <div id="roomInfo">
+      <p>Room: <span id="currentRoom">default</span></p>
+      <input type="text" id="roomInput" placeholder="Enter room ID...">
+      <button id="joinRoomBtn">Join Room</button>
+    </div>
+
+    <div id="controls">
+      <div class="control-group">
+        <label>
+          <input type="checkbox" id="enableCursorTracking" checked> Enable Cursor Tracking
+        </label>
+      </div>
+      <div class="control-group">
+        <label>Custom Event Name:</label>
+        <input type="text" id="eventName" placeholder="e.g., 'selection', 'draw'">
+      </div>
+      <div class="control-group">
+        <label>Custom Event Data (JSON):</label>
+        <textarea id="eventData" placeholder='{"x": 100, "y": 200}'></textarea>
+      </div>
+      <button id="connectBtn" style="background: #059669;">Connect</button>
+      <button id="sendEventBtn">Send Custom Event</button>
+      <button id="disconnectBtn" style="background: #dc2626; margin-left: 10px; display: none;">Disconnect</button>
+    </div>
+
+    <div id="stats">
+      <p>Cursor updates sent: <span id="cursorCount">0</span></p>
+      <p>Custom events sent: <span id="eventCount">0</span></p>
+      <p>Reconnection attempts: <span id="reconnectCount">0</span></p>
+    </div>
+  </div>
+
+  <div id="typing" style="display: none;">
+    <span id="typingText"></span> is typing...
+  </div>
+
+  <div id="customEvents">
+    <strong>Custom Events Received:</strong>
+    <div id="eventsList"></div>
+  </div>
+  
+  <input type="text" id="input" placeholder="Type something to see typing indicator..." style="position: fixed; bottom: 80px; left: 20px; width: 300px;">
+
+  <script type="module">
+    // Try dist first (production), fallback to src (development)
+    let createCollabClient
+    try {
+      createCollabClient = (await import("/dist/client.js")).createCollabClient
+    } catch {
+      createCollabClient = (await import("/src/client.js")).createCollabClient
+    }
+
+    // Get room ID from URL or use default
+    const urlParams = new URLSearchParams(window.location.search)
+    const roomId = urlParams.get('room') || 'default'
+    
+    // Stats
+    let cursorUpdateCount = 0
+    let eventCount = 0
+    let reconnectCount = 0
+    let collab = null
+    let cursorTrackingEnabled = true
+
+    // DOM elements
+    const cursors = document.getElementById("cursors")
+    const userCount = document.getElementById("userCount")
+    const typingDiv = document.getElementById("typing")
+    const typingText = document.getElementById("typingText")
+    const input = document.getElementById("input")
+    const currentRoomEl = document.getElementById("currentRoom")
+    const roomInput = document.getElementById("roomInput")
+    const joinRoomBtn = document.getElementById("joinRoomBtn")
+    const statusIndicator = document.getElementById("statusIndicator")
+    const connectionStatus = document.getElementById("connectionStatus")
+    const eventName = document.getElementById("eventName")
+    const eventData = document.getElementById("eventData")
+    const sendEventBtn = document.getElementById("sendEventBtn")
+    const disconnectBtn = document.getElementById("disconnectBtn")
+    const connectBtn = document.getElementById("connectBtn")
+    const enableCursorTracking = document.getElementById("enableCursorTracking")
+    const cursorCount = document.getElementById("cursorCount")
+    const eventCountEl = document.getElementById("eventCount")
+    const reconnectCountEl = document.getElementById("reconnectCount")
+    const eventsList = document.getElementById("eventsList")
+    
+    if (currentRoomEl) currentRoomEl.textContent = roomId
+    
+    const cursorElements = new Map()
+    const userTypingStatus = new Map()
+    let typingTimeout = null
+
+    // Update connection status UI
+    function updateConnectionStatus(state) {
+      statusIndicator.className = `status-indicator ${state}`
+      connectionStatus.textContent = state.charAt(0).toUpperCase() + state.slice(1)
+    }
+
+    // Function to create and connect client
+    function createClient() {
+      if (collab) {
+        collab.disconnect()
+      }
+
+      collab = createCollabClient({
+        url: "ws://localhost:3001",
+        roomId: roomId,
+        metadata: {
+          name: `User ${Math.random().toString(36).substr(2, 5)}`,
+          color: `hsl(${Math.random() * 360}, 70%, 50%)`
+        },
+        // Configure reconnection
+        reconnect: {
+          enabled: true,
+          maxRetries: 10,
+          initialDelay: 1000,
+          maxDelay: 30000,
+          backoffFactor: 2
+        },
+        // Throttle cursor updates to 20 per second
+        throttleCursor: 50,
+        // Heartbeat every 30 seconds
+        heartbeatInterval: 30000
+      })
+
+      setupEventHandlers()
+      updateConnectionStatus(collab.getState())
+    }
+
+    // Track mouse movement (only if enabled and connected)
+    document.addEventListener("mousemove", (e) => {
+      if (collab && cursorTrackingEnabled && collab.getState() === 'connected') {
+        collab.cursor({ x: e.clientX, y: e.clientY })
+        cursorUpdateCount++
+        cursorCount.textContent = cursorUpdateCount
+      }
+    })
+
+    // Track typing
+    input.addEventListener("input", () => {
+      if (collab && collab.getState() === 'connected') {
+        collab.typing(true)
+        clearTimeout(typingTimeout)
+        typingTimeout = setTimeout(() => {
+          if (collab) collab.typing(false)
+        }, 1000)
+      }
+    })
+
+    // Setup all event handlers for the collab client
+    function setupEventHandlers() {
+
+      // Connection state events
+      collab.on("connected", () => {
+        console.log("✅ Connected to server")
+        updateConnectionStatus("connected")
+        disconnectBtn.style.display = "inline-block"
+        connectBtn.style.display = "none"
+      })
+
+      collab.on("disconnected", () => {
+        console.log("❌ Disconnected from server")
+        updateConnectionStatus("disconnected")
+        disconnectBtn.style.display = "none"
+        connectBtn.style.display = "inline-block"
+      })
+
+      // Handle errors
+      collab.on("error", (data) => {
+        console.error("Collab error:", data.error)
+        alert(`Error: ${data.error}`)
+      })
+
+      // Handle presence updates
+      collab.on("presence", (data) => {
+        console.log("Presence update:", data.users.length, "users")
+        userCount.textContent = data.users.length
+        data.users.forEach(user => {
+          userTypingStatus.set(user.id, user.typing || false)
+        })
+        updateTypingIndicator()
+      })
+
+      // Handle user updates (cursor, typing)
+      collab.on("update", (data) => {
+        const { user } = data
+        
+        // Update cursor
+        if (user.cursor) {
+          let cursorEl = cursorElements.get(user.id)
+          if (!cursorEl) {
+            cursorEl = document.createElement("div")
+            cursorEl.className = "cursor"
+            cursorEl.style.borderColor = user.metadata?.color || `hsl(${user.id.charCodeAt(0) * 137.5 % 360}, 70%, 50%)`
+            if (user.metadata?.name) {
+              cursorEl.title = user.metadata.name
+            }
+            cursors.appendChild(cursorEl)
+            cursorElements.set(user.id, cursorEl)
+          }
+          cursorEl.style.left = `${user.cursor.x}px`
+          cursorEl.style.top = `${user.cursor.y}px`
+          
+          // Update cursor style based on connection state
+          if (collab) {
+            const state = collab.getState()
+            if (state === 'reconnecting') {
+              cursorEl.classList.add('reconnecting')
+            } else {
+              cursorEl.classList.remove('reconnecting')
+            }
+          }
+        }
+
+        // Update typing status
+        userTypingStatus.set(user.id, user.typing || false)
+        updateTypingIndicator()
+      })
+
+      // Handle custom events
+      collab.on("custom", (data) => {
+        console.log("Custom event received:", data.event, data.data)
+        
+        // Add to events list
+        const eventItem = document.createElement("div")
+        eventItem.className = "event-item"
+        eventItem.innerHTML = `
+          <span class="event-name">${data.event}</span>: 
+          <span>${JSON.stringify(data.data)}</span>
+        `
+        eventsList.insertBefore(eventItem, eventsList.firstChild)
+        
+        // Keep only last 10 events
+        while (eventsList.children.length > 10) {
+          eventsList.removeChild(eventsList.lastChild)
+        }
+      })
+    }
+
+    // Update typing indicator
+    function updateTypingIndicator() {
+      const typingUsers = Array.from(userTypingStatus.entries())
+        .filter(([id, isTyping]) => isTyping)
+        .map(([id]) => id)
+
+      if (typingUsers.length > 0) {
+        typingDiv.style.display = "block"
+        if (typingUsers.length === 1) {
+          typingText.textContent = `User ${typingUsers[0].slice(0, 8)}`
+        } else {
+          typingText.textContent = `${typingUsers.length} users`
+        }
+      } else {
+        typingDiv.style.display = "none"
+      }
+    }
+    
+    // Room switching
+    if (joinRoomBtn && roomInput) {
+      joinRoomBtn.addEventListener("click", () => {
+        const newRoom = roomInput.value.trim() || "default"
+        collab.joinRoom(newRoom)
+        if (currentRoomEl) currentRoomEl.textContent = newRoom
+        roomInput.value = ""
+        cursorElements.clear()
+        userTypingStatus.clear()
+        cursors.innerHTML = ""
+        typingDiv.style.display = "none"
+      })
+    }
+
+    // Connect button
+    connectBtn.addEventListener("click", () => {
+      createClient()
+    })
+
+    // Cursor tracking toggle
+    enableCursorTracking.addEventListener("change", (e) => {
+      cursorTrackingEnabled = e.target.checked
+      console.log("Cursor tracking:", cursorTrackingEnabled ? "enabled" : "disabled")
+    })
+
+    // Send custom event
+    sendEventBtn.addEventListener("click", () => {
+      if (!collab || collab.getState() !== 'connected') {
+        alert("Please connect first")
+        return
+      }
+
+      const event = eventName.value.trim()
+      if (!event) {
+        alert("Please enter an event name")
+        return
+      }
+
+      let data = null
+      if (eventData.value.trim()) {
+        try {
+          data = JSON.parse(eventData.value)
+        } catch (e) {
+          alert("Invalid JSON in event data")
+          return
+        }
+      }
+
+      collab.send(event, data)
+      eventCount++
+      eventCountEl.textContent = eventCount
+      console.log("Sent custom event:", event, data)
+    })
+
+    // Disconnect button
+    disconnectBtn.addEventListener("click", () => {
+      if (collab) {
+        collab.disconnect()
+        updateConnectionStatus("disconnected")
+      }
+    })
+
+    // Monitor connection state (only if connected)
+    setInterval(() => {
+      if (collab) {
+        const state = collab.getState()
+        updateConnectionStatus(state)
+        
+        if (state === 'reconnecting') {
+          reconnectCount++
+          reconnectCountEl.textContent = reconnectCount
+        }
+      } else {
+        updateConnectionStatus("disconnected")
+      }
+    }, 500)
+
+    // Initial status - not connected
+    updateConnectionStatus("disconnected")
+    connectBtn.style.display = "inline-block"
+    disconnectBtn.style.display = "none"
+  </script>
+</body>
+</html>

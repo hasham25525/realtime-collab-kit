@@ -1,0 +1,33 @@
+{
+  "name": "realtime-collab-kit",
+  "version": "0.1.0",
+  "description": "Production-grade TypeScript WebSocket-based presence, cursors, and typing indicators with rooms, auth, and Redis scaling",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "keywords": ["websocket", "realtime", "collaboration", "presence", "cursor", "typescript", "rooms", "redis"],
+  "author": "Muhammad Hasham Chouhan (hasham25525)",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start:example": "tsx examples/server.ts",
+    "serve": "tsx examples/serve.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "ws": "^8.18.0",
+    "ioredis": "^5.3.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/ws": "^8.5.10",
+    "typescript": "^5.3.3",
+    "tsx": "^4.7.0"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ]
+}

@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Realtime Collab Kit - Example</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #1a1a1a;
+      color: #fff;
+    }
+    #cursors {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1000;
+    }
+    .cursor {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border: 2px solid;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+    #info {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 15px;
+      border-radius: 8px;
+      font-size: 14px;
+      max-width: 300px;
+    }
+    #roomInfo {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid #444;
+      font-size: 12px;
+      color: #aaa;
+    }
+    input[type="text"] {
+      padding: 10px;
+      font-size: 16px;
+      border: 1px solid #444;
+      background: #2a2a2a;
+      color: #fff;
+      border-radius: 4px;
+      width: 300px;
+    }
+    #roomInput {
+      margin-top: 10px;
+      width: 200px;
+    }
+    #typing {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 10px 15px;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div id="cursors"></div>
+  <div id="info">
+    <h3>🛰️ Realtime Collab Kit</h3>
+    <p>Users online: <span id="userCount">0</span></p>
+    <p>Move your mouse to see your cursor!</p>
+    <div id="roomInfo">
+      <p>Room: <span id="currentRoom">default</span></p>
+      <input type="text" id="roomInput" placeholder="Enter room ID...">
+      <button id="joinRoomBtn" style="margin-left: 5px; padding: 10px; background: #4a4a4a; color: #fff; border: none; border-radius: 4px; cursor: pointer;">Join</button>
+    </div>
+  </div>
+  <div id="typing" style="display: none;">
+    <span id="typingText"></span> is typing...
+  </div>
+  
+  <input type="text" id="input" placeholder="Type something to see typing indicator...">
+
+  <script type="module">
+    // Try dist first (production), fallback to src (development)
+    let createCollabClient
+    try {
+      createCollabClient = (await import("/dist/client.js")).createCollabClient
+    } catch {
+      createCollabClient = (await import("/src/client.js")).createCollabClient
+    }
+
+    // Get room ID from URL or use default
+    const urlParams = new URLSearchParams(window.location.search)
+    const roomId = urlParams.get('room') || 'default'
+    
+    const collab = createCollabClient({
+      url: "ws://localhost:3001",
+      roomId: roomId,
+      metadata: {
+        name: `User ${Math.random().toString(36).substr(2, 5)}`,
+        color: `hsl(${Math.random() * 360}, 70%, 50%)`
+      }
+    })
+    const cursors = document.getElementById("cursors")
+    const userCount = document.getElementById("userCount")
+    const typingDiv = document.getElementById("typing")
+    const typingText = document.getElementById("typingText")
+    const input = document.getElementById("input")
+    const currentRoomEl = document.getElementById("currentRoom")
+    const roomInput = document.getElementById("roomInput")
+    const joinRoomBtn = document.getElementById("joinRoomBtn")
+    
+    if (currentRoomEl) currentRoomEl.textContent = roomId
+    
+    const cursorElements = new Map()
+    const userTypingStatus = new Map() // Track typing status for all users
+    let typingTimeout = null
+
+    // Track mouse movement
+    document.addEventListener("mousemove", (e) => {
+      collab.cursor({ x: e.clientX, y: e.clientY })
+    })
+
+    // Track typing
+    input.addEventListener("input", () => {
+      collab.typing(true)
+      clearTimeout(typingTimeout)
+      typingTimeout = setTimeout(() => {
+        collab.typing(false)
+      }, 1000)
+    })
+
+    // Handle errors
+    collab.on("error", (data) => {
+      console.error("Collab error:", data.error)
+      alert(`Error: ${data.error}`)
+    })
+
+    // Handle presence updates
+    collab.on("presence", (data) => {
+      console.log("Presence update:", data.users.length, "users")
+      userCount.textContent = data.users.length
+      // Initialize typing status for all users
+      data.users.forEach(user => {
+        userTypingStatus.set(user.id, user.typing || false)
+      })
+      updateTypingIndicator()
+    })
+
+    // Handle user updates (cursor, typing)
+    collab.on("update", (data) => {
+      const { user } = data
+      console.log("User update:", user.id, user.cursor ? "cursor" : "", user.typing ? "typing" : "")
+      
+      // Update cursor
+      if (user.cursor) {
+        let cursorEl = cursorElements.get(user.id)
+        if (!cursorEl) {
+          cursorEl = document.createElement("div")
+          cursorEl.className = "cursor"
+          cursorEl.style.borderColor = `hsl(${user.id.charCodeAt(0) * 137.5 % 360}, 70%, 50%)`
+          cursors.appendChild(cursorEl)
+          cursorElements.set(user.id, cursorEl)
+        }
+        cursorEl.style.left = `${user.cursor.x}px`
+        cursorEl.style.top = `${user.cursor.y}px`
+      }
+
+      // Update typing status for this user
+      userTypingStatus.set(user.id, user.typing || false)
+      updateTypingIndicator()
+    })
+
+    // Function to update typing indicator based on all users
+    function updateTypingIndicator() {
+      const typingUsers = Array.from(userTypingStatus.entries())
+        .filter(([id, isTyping]) => isTyping)
+        .map(([id]) => id)
+
+      if (typingUsers.length > 0) {
+        typingDiv.style.display = "block"
+        if (typingUsers.length === 1) {
+          typingText.textContent = `User ${typingUsers[0].slice(0, 8)}`
+        } else {
+          typingText.textContent = `${typingUsers.length} users`
+        }
+      } else {
+        typingDiv.style.display = "none"
+      }
+    }
+    
+    // Handle room switching
+    if (joinRoomBtn && roomInput) {
+      joinRoomBtn.addEventListener("click", () => {
+        const newRoom = roomInput.value.trim() || "default"
+        collab.joinRoom(newRoom)
+        if (currentRoomEl) currentRoomEl.textContent = newRoom
+        roomInput.value = ""
+        // Clear cursors and typing status for new room
+        cursorElements.clear()
+        userTypingStatus.clear()
+        cursors.innerHTML = ""
+        typingDiv.style.display = "none"
+      })
+    }
+  </script>
+</body>
+</html>
