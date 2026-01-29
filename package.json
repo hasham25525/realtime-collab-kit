@@ -1,6 +1,6 @@
 {
   "name": "realtime-collab-kit",
-  "version": "1.2.0",
+  "version": "1.2.0-alpha.0",
   "description": "Production-grade TypeScript WebSocket-based presence, cursors, and typing indicators with rooms, auth, and Redis scaling",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
