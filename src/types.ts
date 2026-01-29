@@ -77,15 +77,17 @@ export interface ServerMessage {
   users?: User[]
   user?: User
   error?: string
-  event?: string 
-  data?: unknown 
+  event?: string
+  data?: unknown
+  _excludeUserId?: string
 }
 
 export interface CollabClient {
   on(type: 'presence' | 'update' | 'error' | 'connected' | 'disconnected' | 'custom', callback: (data: ServerMessage) => void): void
   cursor(position: { x: number; y: number }): void
   typing(isTyping: boolean): void
-  send(event: string, data?: unknown): void // Send custom events
+  broadcast(event: string, data?: unknown): void
+  send(event: string, data?: unknown): void
   joinRoom(roomId: string): void
   leaveRoom(): void
   disconnect(): void

@@ -104,45 +104,45 @@ export function createCollabServer(config: ServerConfig = {}) {
 
         // Handle cursor updates
         if (data.type === 'cursor' && data.position && connection) {
-          const conn = connection // Type narrowing
+          const conn = connection
           await adapter.updateUser(conn.roomId, conn.userId, { cursor: data.position })
           const user = (await adapter.getUsers(conn.roomId)).find(u => u.id === conn.userId)
           if (user) {
-            await broadcastToRoom(conn.roomId, { type: 'update', user })
+            await broadcastToRoom(conn.roomId, { type: 'update', user }, conn.userId)
           }
           return
         }
 
         // Handle typing updates
         if (data.type === 'typing' && typeof data.isTyping === 'boolean' && connection) {
-          const conn = connection // Type narrowing
+          const conn = connection
           await adapter.updateUser(conn.roomId, conn.userId, { typing: data.isTyping })
           const user = (await adapter.getUsers(conn.roomId)).find(u => u.id === conn.userId)
           if (user) {
-            await broadcastToRoom(conn.roomId, { type: 'update', user })
+            await broadcastToRoom(conn.roomId, { type: 'update', user }, conn.userId)
           }
           return
         }
 
-        // Handle ping/pong for heartbeat
         if (data.type === 'ping') {
           ws.send(JSON.stringify({ type: 'pong' }))
           return
         }
 
         if (data.type === 'pong') {
-          // Client responded to ping, connection is alive
           return
         }
 
         // Handle custom events
         if (data.type === 'custom' && data.event && connection) {
           const conn = connection
-          await broadcastToRoom(conn.roomId, { 
-            type: 'custom', 
-            event: data.event, 
-            data: data.data 
-          })
+          const user = (await adapter.getUsers(conn.roomId)).find(u => u.id === conn.userId)
+          await broadcastToRoom(conn.roomId, {
+            type: 'custom',
+            event: data.event,
+            data: data.data,
+            user: user ?? { id: conn.userId, roomId: conn.roomId, cursor: null, typing: false, metadata: conn.metadata }
+          }, conn.userId)
           return
         }
       } catch (error) {
@@ -167,12 +167,14 @@ export function createCollabServer(config: ServerConfig = {}) {
     if (roomSubscriptions.has(roomId)) return
 
     const callback = async (message: ServerMessage) => {
+      const { _excludeUserId, ...payload } = message
       const roomConnections = Array.from(connections.values())
         .filter(conn => conn.roomId === roomId)
       
       for (const conn of roomConnections) {
+        if (_excludeUserId !== undefined && conn.userId === _excludeUserId) continue
         if (conn.ws.readyState === WebSocket.OPEN) {
-          conn.ws.send(JSON.stringify(message))
+          conn.ws.send(JSON.stringify(payload))
         }
       }
     }
@@ -189,11 +191,12 @@ export function createCollabServer(config: ServerConfig = {}) {
     }
   }
 
-  async function broadcastToRoom(roomId: string, message: ServerMessage): Promise<void> {
-    await adapter.broadcast(roomId, message)
+  async function broadcastToRoom(roomId: string, message: ServerMessage, excludeUserId?: string): Promise<void> {
+    const payload: ServerMessage = excludeUserId ? { ...message, _excludeUserId: excludeUserId } : message
+    await adapter.broadcast(roomId, payload)
   }
 
-  console.log(`🛰️ Collab server running on ws://localhost:${port}`)
+  console.log(`  Collab server running on ws://localhost:${port}`)
   if (adapterConfig?.type === 'redis') {
     console.log(`   Using Redis adapter for scaling`)
   }

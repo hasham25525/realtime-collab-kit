@@ -64,25 +64,23 @@ export function createCollabClient(config: ClientConfig): CollabClient {
 
       ws.onmessage = (event: MessageEvent) => {
         try {
-          const data = JSON.parse(event.data) as ServerMessage
-          
-          // Handle ping/pong
-          if (data.type === 'ping') {
+          const raw = JSON.parse(event.data) as ServerMessage & { _excludeUserId?: string }
+          const { _excludeUserId: _, ...data } = raw
+          const payload = data as ServerMessage
+
+          if (payload.type === 'ping') {
             sendMessage('pong', {})
             return
           }
-          if (data.type === 'pong') {
-            // Heartbeat received, connection is alive
+          if (payload.type === 'pong') {
             return
           }
 
-          // Emit to listeners
-          if (listeners[data.type]) {
-            listeners[data.type].forEach((cb) => cb(data))
+          if (listeners[payload.type]) {
+            listeners[payload.type].forEach((cb) => cb(payload))
           }
-          // Also handle error messages
-          if (data.type === 'error' && listeners['error']) {
-            listeners['error'].forEach((cb) => cb(data))
+          if (payload.type === 'error' && listeners['error']) {
+            listeners['error'].forEach((cb) => cb(payload))
           }
         } catch (error) {
           console.error('Failed to parse message:', error)
@@ -212,6 +210,9 @@ export function createCollabClient(config: ClientConfig): CollabClient {
     },
     typing: (isTyping: boolean) => {
       sendMessage('typing', { isTyping, roomId: currentRoomId })
+    },
+    broadcast: (event: string, data?: unknown) => {
+      sendMessage('custom', { event, data, roomId: currentRoomId })
     },
     send: (event: string, data?: unknown) => {
       sendMessage('custom', { event, data, roomId: currentRoomId })

@@ -1,21 +1,22 @@
-# realtime-collab-kit 🛰️
+# realtime-collab-kit 
 
 Production-grade TypeScript WebSocket-based presence, cursors, and typing indicators with **rooms**, **auth tokens**, and **Redis scaling**.
 
 ## Features
 
-- ✨ **Presence** - See who's online in real-time
-- 🖱️ **Live Cursors** - Real-time cursor positions (with automatic throttling)
-- ⌨️ **Typing Indicators** - "User is typing..." notifications
-- 🏠 **Rooms** - Isolate users into separate collaboration spaces
-- 🔐 **Auth Tokens** - Secure authentication support
-- 📦 **Redis Scaling** - Horizontal scaling with Redis adapter
-- 🔄 **Auto Reconnection** - Automatic reconnection with exponential backoff
-- 💬 **Custom Events** - Send and receive custom messages
-- 💓 **Heartbeat** - Connection health monitoring with ping/pong
-- 📊 **Connection State** - Track connection status (connecting/connected/disconnected)
-- 🎯 **TypeScript** - Full type safety
-- 🚀 **Lightweight** - Zero framework lock-in
+-  **Presence** - See who's online in real-time
+-  **Live Cursors** - Real-time cursor positions (with automatic throttling)
+-  **Typing Indicators** - "User is typing..." notifications
+-  **Rooms** - Isolate users into separate collaboration spaces
+-  **Auth Tokens** - Secure authentication support
+-  **Redis Scaling** - Horizontal scaling with Redis adapter
+-  **Auto Reconnection** - Automatic reconnection with exponential backoff
+-  **Custom Events** - Send and receive custom messages (use `collab.broadcast()`; you never receive your own)
+-  **Auto-echo** - Server filters out the sender when broadcasting so you don't get your own cursor/typing/custom events
+-  **Heartbeat** - Connection health monitoring with ping/pong
+-  **Connection State** - Track connection status (connecting/connected/disconnected)
+-  **TypeScript** - Full type safety
+-  **Lightweight** - Zero framework lock-in
 
 ## Install
 
@@ -94,8 +95,9 @@ collab.typing(true)  // User started typing
 collab.typing(false) // User stopped typing
 
 // Send custom events
-collab.send("selection", { start: 0, end: 10 })
-collab.send("draw", { x: 100, y: 200, color: "#ff0000" })
+collab.broadcast("selection", { start: 0, end: 10 })
+collab.broadcast("draw", { x: 100, y: 200, color: "#ff0000" })
+collab.send("chat", { text: "Hello" })
 
 // Switch rooms
 collab.joinRoom("another-room")
@@ -357,6 +359,7 @@ import type {
 - **Rooms**: Isolate users into separate collaboration spaces
 - **Auth**: Optional token-based authentication
 - **TypeScript**: Full type safety throughout
+- **Payload.user**: Server always populates `payload.user` (id, roomId, cursor, typing, metadata) for `update` and `custom` events so you can rely on `payload.user.id` and structure.
 
 ## License
 
